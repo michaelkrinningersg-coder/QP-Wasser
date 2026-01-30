@@ -1,0 +1,5 @@
+{
+  "name": "LabData Manager",
+  "description": "Ein Tool zum Einlesen, Anzeigen und Analysieren von Labor-Rohdaten im CSV-Format.",
+  "requestFramePermissions": []
+}

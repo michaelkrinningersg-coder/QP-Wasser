@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LabData Manager (Single File)</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.min.js"></script>
+    
+    <!-- React & ReactDOM (UMD) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel Standalone (to compile JSX in browser) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: #f1f1f1; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      .animate-fade-in-up { animation: fadeInUp 0.5s ease-out; }
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translate3d(0, 20px, 0); }
+        to { opacity: 1; transform: translate3d(0, 0, 0); }
+      }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback } = React;
+
+        // --- ICONS (Inline SVG replacements for Lucide) ---
+        const IconBase = ({ children, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+        );
+        const UploadCloud = (props) => <IconBase {...props}><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></IconBase>;
+        const Upload = (props) => <IconBase {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></IconBase>;
+        const FileSpreadsheet = (props) => <IconBase {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></IconBase>;
+        const Calculator = (props) => <IconBase {...props}><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></IconBase>;
+        const CheckSquare = (props) => <IconBase {...props}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></IconBase>;
+        const FileBarChart = (props) => <IconBase {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M8 18v-1"/><path d="M16 18v-3"/></IconBase>;
+        const FileOutput = (props) => <IconBase {...props}><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><polyline points="14 2 14 8 20 8"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></IconBase>;
+        const AlertCircle = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></IconBase>;
+        const CheckCircle2 = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></IconBase>;
+        const FileCheck = (props) => <IconBase {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></IconBase>;
+        const AlertTriangle = (props) => <IconBase {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></IconBase>;
+        const Square = (props) => <IconBase {...props}><rect width="18" height="18" x="3" y="3" rx="2"/></IconBase>;
+        const Check = (props) => <IconBase {...props}><polyline points="20 6 9 17 4 12"/></IconBase>;
+        const X = (props) => <IconBase {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></IconBase>;
+        const Download = (props) => <IconBase {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></IconBase>;
+
+
+        // --- CONSTANTS & HELPERS ---
+        const AppTab = {
+            IMPORT: 'import',
+            RAW_DATA: 'raw_data',
+            ION_BALANCE: 'ion_balance',
+            SELECTION: 'selection',
+            REPORT: 'report',
+            EXPORT: 'export'
+        };
+
+        const COMMENT_OPTIONS = [
+            "",
+            "Corg>20",
+            "NM",
+            "Abweichung im Rahmen der NWG",
+            "Corg>10 LTF<50",
+            "durch Nachmessung bestätigt",
+            "Grenzfall",
+            "Probe leer",
+            "keine Alkalinität bestimmt bei pH > 6",
+            "Leitfähigkeit < 30",
+            "gilt nur für Ideal verdünnte Lösungen",
+            "anderer Grund"
+        ];
+
+        const parseGermanFloat = (val) => {
+            if (!val) return NaN;
+            const cleanVal = val.replace(',', '.').trim();
+            return parseFloat(cleanVal);
+        };
+
+        const formatGermanFloat = (val, decimals = 2) => {
+            if (isNaN(val)) return "";
+            return val.toFixed(decimals).replace('.', ',');
+        };
+
+        const parseLabDataCsv = (file) => {
+            return new Promise((resolve, reject) => {
+                Papa.parse(file, {
+                encoding: 'ISO-8859-1',
+                complete: (results) => {
+                    try {
+                    const rawRows = results.data;
+                    if (!rawRows || rawRows.length < 3) throw new Error("Die Datei scheint leer zu sein oder hat nicht genügend Zeilen.");
+
+                    const headerRowIndex = 1;
+                    const dataStartIndex = 2;
+                    const resultStartIndex = 7;
+                    const headerRow = rawRows[headerRowIndex];
+                    if (!headerRow) throw new Error("Konnte die Header-Zeile (Zeile 2) nicht lesen.");
+
+                    const headerMapping = [];
+                    for (let i = resultStartIndex; i < headerRow.length; i++) {
+                        const headerName = headerRow[i];
+                        if (headerName && headerName.trim() !== '') {
+                        headerMapping.push({ name: headerName.trim(), originalIndex: i });
+                        }
+                    }
+                    headerMapping.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+                    const sortedResultHeaders = headerMapping.map(h => h.name);
+
+                    const parsedData = [];
+                    for (let i = dataStartIndex; i < rawRows.length; i++) {
+                        const row = rawRows[i];
+                        if (!row || row.length < 2 || (row.length === 1 && row[0] === '')) continue;
+                        const resultValues = {};
+                        headerMapping.forEach((mapItem) => {
+                            const val = row[mapItem.originalIndex];
+                            resultValues[mapItem.name] = val ? val.trim() : '';
+                        });
+                        const repeatVal = row[3] ? row[3].trim() : '';
+                        const isRepeat = repeatVal === '2';
+                        parsedData.push({
+                            id: `row-${i}`,
+                            seriesId: row[0] ? row[0].trim() : '',
+                            sampleId: row[1] ? row[1].trim() : '',
+                            isRepeat: isRepeat,
+                            rawRepeatValue: repeatVal,
+                            results: resultValues
+                        });
+                    }
+                    resolve({
+                        fileName: file.name,
+                        uploadDate: new Date(),
+                        resultHeaders: sortedResultHeaders,
+                        data: parsedData
+                    });
+                    } catch (err) { reject(err); }
+                },
+                error: (err) => reject(err),
+                header: false,
+                skipEmptyLines: true
+                });
+            });
+        };
+
+        // --- COMPONENTS ---
+
+        // 1. TabNavigation
+        const TabNavigation = ({ activeTab, onTabChange, isDataLoaded }) => {
+            const getTabClass = (tab, disabled = false) => {
+                const base = "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors duration-200 whitespace-nowrap";
+                if (disabled) return `${base} text-slate-400 border-transparent cursor-not-allowed`;
+                if (activeTab === tab) return `${base} border-blue-600 text-blue-600 bg-blue-50/50`;
+                return `${base} border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50`;
+            };
+            return (
+                <div className="w-full border-b border-slate-200 bg-white sticky top-0 z-10 shadow-sm overflow-x-auto">
+                    <div className="max-w-[95%] mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="flex -mb-px">
+                            <button onClick={() => onTabChange(AppTab.IMPORT)} className={getTabClass(AppTab.IMPORT)}><Upload className="w-4 h-4"/> Import</button>
+                            <button onClick={() => isDataLoaded && onTabChange(AppTab.RAW_DATA)} disabled={!isDataLoaded} className={getTabClass(AppTab.RAW_DATA, !isDataLoaded)}><FileSpreadsheet className="w-4 h-4"/> Rohdaten</button>
+                            <button onClick={() => isDataLoaded && onTabChange(AppTab.ION_BALANCE)} disabled={!isDataLoaded} className={getTabClass(AppTab.ION_BALANCE, !isDataLoaded)}><Calculator className="w-4 h-4"/> Ionenbilanz</button>
+                            <button onClick={() => isDataLoaded && onTabChange(AppTab.SELECTION)} disabled={!isDataLoaded} className={getTabClass(AppTab.SELECTION, !isDataLoaded)}><CheckSquare className="w-4 h-4"/> Auswahl</button>
+                            <button onClick={() => isDataLoaded && onTabChange(AppTab.REPORT)} disabled={!isDataLoaded} className={getTabClass(AppTab.REPORT, !isDataLoaded)}><FileBarChart className="w-4 h-4"/> Nachmessung</button>
+                            <button onClick={() => isDataLoaded && onTabChange(AppTab.EXPORT)} disabled={!isDataLoaded} className={getTabClass(AppTab.EXPORT, !isDataLoaded)}><FileOutput className="w-4 h-4"/> Export (Sonstiges)</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 2. FileUpload
+        const FileUpload = ({ onFileSelect, isLoading, error }) => {
+            const [dragActive, setDragActive] = useState(false);
+            const handleDrag = useCallback((e) => {
+                e.preventDefault(); e.stopPropagation();
+                if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
+                else if (e.type === "dragleave") setDragActive(false);
+            }, []);
+            const handleDrop = useCallback((e) => {
+                e.preventDefault(); e.stopPropagation(); setDragActive(false);
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) validateAndPassFile(e.dataTransfer.files[0]);
+            }, []);
+            const handleChange = (e) => { e.preventDefault(); if (e.target.files && e.target.files[0]) validateAndPassFile(e.target.files[0]); };
+            const validateAndPassFile = (file) => {
+                if (file.name.endsWith('.csv') || file.type === 'text/csv' || file.type === 'application/vnd.ms-excel') onFileSelect(file);
+                else alert("Bitte laden Sie eine .csv Datei hoch.");
+            };
+            return (
+                <div className="max-w-xl mx-auto mt-10 p-6 bg-white rounded-xl shadow-sm border border-slate-200">
+                    <h2 className="text-xl font-semibold text-slate-800 mb-2">Datei Import</h2>
+                    <p className="text-sm text-slate-500 mb-6">Laden Sie hier die CSV-Datei hoch. Das System erwartet die Probenkennungen in Spalte 2, Ergebnisse ab Spalte 8.</p>
+                    <div className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100'} ${isLoading ? 'opacity-50 pointer-events-none' : ''}`} onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}>
+                        <input id="dropzone-file" type="file" className="hidden" accept=".csv" onChange={handleChange} />
+                        <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-full">
+                            {isLoading ? (
+                                <div className="flex flex-col items-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div><p className="text-sm text-slate-500">Datei wird verarbeitet...</p></div>
+                            ) : (
+                                <><UploadCloud className={`w-12 h-12 mb-3 ${dragActive ? 'text-blue-500' : 'text-slate-400'}`} /><p className="mb-2 text-sm text-slate-600"><span className="font-semibold">Klicken zum Auswählen</span> oder Datei hierher ziehen</p><p className="text-xs text-slate-500">CSV Dateien</p></>
+                            )}
+                        </label>
+                    </div>
+                    {error && <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg flex items-start gap-3 text-sm"><AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" /><div><p className="font-semibold">Fehler beim Einlesen:</p><p>{error}</p></div></div>}
+                </div>
+            );
+        };
+
+        // 3. RawDataViewer
+        const RawDataViewer = ({ dataset }) => {
+            const headers = useMemo(() => dataset.resultHeaders, [dataset]);
+            return (
+                <div className="space-y-4 h-full flex flex-col">
+                    <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between flex-shrink-0">
+                        <div className="flex items-center gap-3"><div className="p-2 bg-green-100 rounded-full"><FileCheck className="w-5 h-5 text-green-600"/></div><div><h3 className="font-medium text-slate-900">{dataset.fileName}</h3><p className="text-xs text-slate-500">Importiert am {dataset.uploadDate.toLocaleString()} • {dataset.data.length} Zeilen</p></div></div>
+                        <div className="text-sm text-slate-500"><span className="font-medium">{dataset.resultHeaders.length}</span> Ergebnisse erkannt</div>
+                    </div>
+                    <div className="flex-grow bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden flex flex-col">
+                        <div className="overflow-x-auto overflow-y-auto flex-grow">
+                            <table className="w-full text-sm text-left text-slate-600 whitespace-nowrap">
+                                <thead className="text-xs text-slate-700 uppercase bg-slate-50 sticky top-0 z-10 shadow-sm">
+                                    <tr>
+                                        <th scope="col" className="px-6 py-3 border-b border-slate-200 bg-slate-50 font-bold min-w-[100px]">Serie (Sp1)</th>
+                                        <th scope="col" className="px-6 py-3 border-b border-slate-200 bg-slate-50 font-bold min-w-[150px]">Probenkennung (Sp2)</th>
+                                        <th scope="col" className="px-6 py-3 border-b border-slate-200 bg-slate-50 font-bold text-center min-w-[80px]">Wdh? (Sp4)</th>
+                                        {headers.map((header, idx) => (<th key={idx} scope="col" className="px-6 py-3 border-b border-slate-200 bg-slate-50 min-w-[120px] text-blue-800">{header}</th>))}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {dataset.data.map((row) => (
+                                        <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-3 font-medium text-slate-900">{row.seriesId}</td>
+                                            <td className="px-6 py-3">{row.sampleId}</td>
+                                            <td className="px-6 py-3 text-center">{row.isRepeat ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"><AlertTriangle className="w-3 h-3 mr-1"/>Ja</span> : <span className="text-slate-300">-</span>}</td>
+                                            {headers.map((header, idx) => (<td key={idx} className="px-6 py-3">{row.results[header]}</td>))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {dataset.data.length === 0 && <div className="flex flex-col items-center justify-center h-64 text-slate-400"><p>Keine Datenzeilen gefunden.</p></div>}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 4. IonBalanceAnalysis
+        const IonBalanceAnalysis = ({ dataset, comments, setComments }) => {
+            const processedData = useMemo(() => {
+                const sorted = [...dataset.data].sort((a, b) => {
+                    const idComparison = a.sampleId.localeCompare(b.sampleId, undefined, { numeric: true, sensitivity: 'base' });
+                    if (idComparison !== 0) return idComparison;
+                    return (Number(a.isRepeat) - Number(b.isRepeat));
+                });
+                const headers = dataset.resultHeaders;
+                const colAlkalinity = headers.find(h => h.toLowerCase().startsWith('alkalinität-gran')) || '';
+                const colCorg = headers.find(h => h === 'Corg berechnet') || '';
+                const colCond31 = headers.find(h => h === 'LFLFLFM3.1') || '';
+                const colCond13 = headers.find(h => h === 'LFLFLFM1.3') || '';
+                const colQuotientElf = headers.find(h => h === 'Quotient ELF_eu_korr') || '';
+                const colQuotientIons = headers.find(h => h === 'Quotient Kationen Anionen NFV') || '';
+                const colTheoCond = headers.find(h => h === 'Theo elekt Leit (EU) korr') || '';
+
+                return sorted.map(row => {
+                    const valAlkalinity = colAlkalinity ? row.results[colAlkalinity] : '';
+                    const valCorg = colCorg ? row.results[colCorg] : '';
+                    const numCorg = parseGermanFloat(valCorg);
+                    let valCond = '';
+                    let isCondFallback = false;
+                    const val31 = colCond31 ? row.results[colCond31] : '';
+                    const val13 = colCond13 ? row.results[colCond13] : '';
+                    if (val31 && val31.trim() !== '') valCond = val31;
+                    else if (val13 && val13.trim() !== '') { valCond = val13; isCondFallback = true; }
+
+                    const valQuotientElf = colQuotientElf ? row.results[colQuotientElf] : '';
+                    const valQuotientIons = colQuotientIons ? row.results[colQuotientIons] : '';
+                    const valTheoCond = colTheoCond ? row.results[colTheoCond] : '';
+
+                    const numQuotientElf = parseGermanFloat(valQuotientElf);
+                    const numQuotientIons = parseGermanFloat(valQuotientIons);
+                    const numTheoCond = parseGermanFloat(valTheoCond);
+
+                    // Round Quotient Ions to 2 decimals for validation logic
+                    const roundedQuotientIons = !isNaN(numQuotientIons) 
+                        ? parseFloat(numQuotientIons.toFixed(2)) 
+                        : NaN;
+
+                    // Validate against the rounded value
+                    const isIbOk = !isNaN(roundedQuotientIons) && roundedQuotientIons >= 0.9 && roundedQuotientIons <= 1.1;
+                    
+                    const numCond = parseGermanFloat(valCond);
+                    
+                    let isLfOk = false;
+                    let calculatedCondQuotient = NaN;
+                    if (!isNaN(numCond) && !isNaN(numTheoCond) && numTheoCond !== 0) {
+                        calculatedCondQuotient = numCond / numTheoCond;
+                        if (numCond > 20) isLfOk = calculatedCondQuotient >= 0.9 && calculatedCondQuotient <= 1.1;
+                        else if (numCond >= 10) isLfOk = calculatedCondQuotient >= 0.8 && calculatedCondQuotient <= 1.2;
+                        else isLfOk = calculatedCondQuotient >= 0.7 && calculatedCondQuotient <= 1.3;
+                    }
+
+                    let bem = "";
+                    if (!row.isRepeat) {
+                        const hasIbData = !isNaN(roundedQuotientIons);
+                        const hasLfData = !isNaN(calculatedCondQuotient);
+                        if (hasIbData && hasLfData) {
+                            if (isIbOk && isLfOk) bem = "ok";
+                            else if (isIbOk && !isLfOk) bem = "IB ok, LF nicht";
+                            else if (!isIbOk && isLfOk) bem = "IB nicht ok ; LF ok";
+                            else bem = "IB nicht ok + LF nicht ok";
+                        } else if (hasIbData && !hasLfData) {
+                            bem = isIbOk ? "IB ok" : "IB nicht ok";
+                        }
+                    }
+
+                    let autoComment = "";
+                    if (!row.isRepeat) {
+                        const isDeviation = !isIbOk || !isLfOk;
+
+                        // Prio 1: Corg > 20
+                        if (isDeviation && !isNaN(numCorg) && numCorg > 20) {
+                            autoComment = "Corg>20";
+                        }
+                        // Prio 2: Spezifischer Fall
+                        // Entfernt: && !isIbOk
+                        else if (isDeviation && !isNaN(numCorg) && numCorg > 10 && !isNaN(numCond) && numCond < 50) {
+                            autoComment = "Corg>10 LTF<50";
+                        }
+                        // Prio 3: Hohe Leitfähigkeit
+                        else if (!isNaN(numCond) && numCond > 300 && !isLfOk) {
+                            autoComment = "gilt nur für Ideal verdünnte Lösungen";
+                        }
+                        // Prio 4: Niedrige Leitfähigkeit
+                        else if (isDeviation && !isNaN(numCond) && numCond < 30) {
+                            autoComment = "Leitfähigkeit < 30";
+                        }
+                    }
+
+                    return { 
+                        ...row, 
+                        display: { 
+                            alkalinity: valAlkalinity, 
+                            corg: valCorg, 
+                            cond: valCond, 
+                            isCondFallback, 
+                            // Formatting specific: ELF (2 dec), Ions (2 dec), Theo (1 dec)
+                            quotientElf: formatGermanFloat(numQuotientElf, 2), 
+                            quotientIons: formatGermanFloat(numQuotientIons, 2), 
+                            theoCond: formatGermanFloat(numTheoCond, 1), 
+                            calcCondQuotient: formatGermanFloat(calculatedCondQuotient, 2), 
+                            bemerkung: bem, 
+                            autoComment 
+                        } 
+                    };
+                });
+            }, [dataset]);
+
+            useEffect(() => {
+                setComments(prev => {
+                    const next = { ...prev };
+                    let changed = false;
+                    processedData.forEach(row => {
+                        if (row.display.autoComment && !next[row.id]) { next[row.id] = row.display.autoComment; changed = true; }
+                    });
+                    return changed ? next : prev;
+                });
+            }, [processedData, setComments]);
+
+            const handleExport = () => {
+                const header = ["Probenkennung","WDH","Alkalinität","Corg berechnet","Leitfähigkeit","Quotient ELF_eu_korr","Quotient Kationen Anionen NFV","Theo elekt Leit (EU) korr","Q. LF/Theo (ber.)","Bemerkung","Kommentar"];
+                const csvRows = processedData.map(row => {
+                    const comment = comments[row.id] || "";
+                    const escape = (val) => `"${(val || '').replace(/"/g, '""')}"`;
+                    return [escape(row.sampleId), row.isRepeat ? "ja" : "nein", escape(row.display.alkalinity), escape(row.display.corg), escape(row.display.cond), escape(row.display.quotientElf), escape(row.display.quotientIons), escape(row.display.theoCond), escape(row.display.calcCondQuotient), escape(row.display.bemerkung), escape(comment)].join(';');
+                });
+                const csvContent = "\uFEFF" + [header.join(';'), ...csvRows].join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a'); link.href = url; link.download = `Ionenbilanz_${dataset.fileName.replace('.csv', '')}_export.csv`;
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            };
+
+            return (
+                <div className="space-y-4 h-full flex flex-col">
+                    <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between flex-shrink-0">
+                        <div><h3 className="font-medium text-slate-900">Ionenbilanz Auswertung</h3><p className="text-xs text-slate-500">Automatischer Kommentarvorschlag bei Auffälligkeiten (z.B. Corg &gt; 20).</p></div>
+                        <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium"><Download className="w-4 h-4" /> Exportieren</button>
+                    </div>
+                    <div className="flex-grow bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden flex flex-col">
+                        <div className="overflow-x-auto overflow-y-auto flex-grow">
+                            <table className="w-full text-sm text-left text-slate-600 whitespace-nowrap border-separate border-spacing-0">
+                                <thead className="text-xs text-slate-700 uppercase bg-slate-50 z-10 shadow-sm">
+                                    <tr>
+                                        <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 min-w-[120px] shadow-[0_1px_0_0_rgba(226,232,240,1)]">Probenkennung</th>
+                                        <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 w-16 text-center shadow-[0_1px_0_0_rgba(226,232,240,1)]">WDH</th>
+                                        <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Alkalinität</th>
+                                        <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Corg ber.</th>
+                                        <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Leitfähigkeit</th>
+                                        <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Q. ELF_eu_korr</th>
+                                        <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Q. Kat/An NFV</th>
+                                        <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Theo LF (EU)</th>
+                                        <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 text-blue-700 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Q. LF/Theo (ber.)</th>
+                                        <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Bemerkung</th>
+                                        <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 min-w-[200px] shadow-[0_1px_0_0_rgba(226,232,240,1)]">Kommentar</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {processedData.map((row) => (
+                                        <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-4 py-2 font-medium text-slate-900">{row.sampleId}</td>
+                                            <td className="px-4 py-2 text-center">{row.isRepeat ? <span className="text-amber-600 font-bold">Ja</span> : <span className="text-slate-300">-</span>}</td>
+                                            <td className="px-4 py-2">{row.display.alkalinity}</td>
+                                            <td className="px-4 py-2">{row.display.corg}</td>
+                                            <td className={`px-4 py-2 font-mono ${row.display.isCondFallback ? 'text-red-600 font-bold' : ''}`}>{row.display.cond}{row.display.isCondFallback && <span className="ml-1 text-[10px] align-top text-red-400">*</span>}</td>
+                                            <td className="px-4 py-2">{row.display.quotientElf}</td>
+                                            <td className="px-4 py-2">{row.display.quotientIons}</td>
+                                            <td className="px-4 py-2">{row.display.theoCond}</td>
+                                            <td className="px-4 py-2 font-mono text-blue-700">{row.display.calcCondQuotient}</td>
+                                            <td className="px-4 py-2">{row.display.bemerkung === 'ok' ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">ok</span> : row.display.bemerkung ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-800">{row.display.bemerkung}</span> : null}</td>
+                                            <td className="px-4 py-2">
+                                                <select value={comments[row.id] || ""} onChange={(e) => setComments(p => ({ ...p, [row.id]: e.target.value }))} className="block w-full rounded-md border-slate-300 py-1.5 text-xs focus:border-blue-500 focus:ring-blue-500 bg-white border shadow-sm">
+                                                    {COMMENT_OPTIONS.map((opt, i) => (<option key={i} value={opt}>{opt}</option>))}
+                                                </select>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {processedData.length === 0 && <div className="p-8 text-center text-slate-400">Keine Daten verfügbar</div>}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 5. DataSelection
+        const DataSelection = ({ dataset, selection, setSelection }) => {
+            const GROUP_ORDER = ['pH-LF-TIT', 'TOC', 'IC', 'ICP-OES', 'Sonstige'];
+            const getDeviceGroup = (headerBase) => {
+                const h = headerBase.toUpperCase();
+                if (h.includes('TIT') || h.includes('M1.') || h.includes('M3.') || h.includes('M8.') || h.includes('HH+PHM') || h.includes('LFLFM')) return 'pH-LF-TIT';
+                if (h.includes('TOC')) return 'TOC';
+                if (h.includes('ICP')) return 'ICP-OES'; 
+                if (h.includes('IC')) return 'IC';
+                return 'Sonstige';
+            };
+            
+            const relevantHeaders = useMemo(() => dataset.resultHeaders.filter(h => /(ICP|IC|TOC|TIT|M\d+\.|HH\+PHM|LFLFM)/.test(h.toUpperCase())), [dataset]);
+            const getBaseName = (header) => header.replace(/\d+\.\d+$/, '');
+            const formatParamName = (baseName) => baseName.replace(/^(TIT|ICP|IC|TOC)/i, '');
+            const getParamColor = (baseName) => {
+                const group = getDeviceGroup(baseName);
+                switch (group) {
+                    case 'ICP-OES': return 'bg-blue-100 text-blue-800 border-blue-200';
+                    case 'IC': return 'bg-red-100 text-red-800 border-red-200';
+                    case 'TOC': return 'bg-green-100 text-green-800 border-green-200';
+                    case 'pH-LF-TIT': return 'bg-purple-100 text-purple-800 border-purple-200';
+                    default: return 'bg-slate-100 text-slate-700 border-slate-200';
+                }
+            };
+
+            const rowAvailableParams = useMemo(() => {
+                const map = {};
+                dataset.data.forEach(row => {
+                    const available = new Set();
+                    relevantHeaders.forEach(h => { if (row.results[h] && row.results[h].trim() !== '') available.add(getBaseName(h)); });
+                    const sorted = Array.from(available).sort((a, b) => {
+                        const gA = getDeviceGroup(a), gB = getDeviceGroup(b);
+                        const idxA = GROUP_ORDER.indexOf(gA), idxB = GROUP_ORDER.indexOf(gB);
+                        if (idxA !== idxB) return idxA - idxB;
+                        // Sort alphabetically within groups (including IC)
+                        return a.localeCompare(b);
+                    });
+                    map[row.id] = sorted;
+                });
+                return map;
+            }, [dataset, relevantHeaders]);
+
+            const toggleRow = (id) => setSelection(prev => {
+                const newSet = new Set(prev.selectedRowIds);
+                if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+                return { ...prev, selectedRowIds: newSet };
+            });
+            const toggleAllRows = () => {
+                if (selection.selectedRowIds.size === dataset.data.length) setSelection(prev => ({ ...prev, selectedRowIds: new Set() }));
+                else setSelection(prev => ({ ...prev, selectedRowIds: new Set(dataset.data.map(r => r.id)) }));
+            };
+            const toggleRowParam = (rowId, baseParam) => setSelection(prev => {
+                const current = prev.rowParams[rowId] ? new Set(prev.rowParams[rowId]) : new Set();
+                if (current.has(baseParam)) current.delete(baseParam); else current.add(baseParam);
+                return { ...prev, rowParams: { ...prev.rowParams, [rowId]: current } };
+            });
+            const toggleAllParamsForRow = (rowId, available) => setSelection(prev => {
+                const current = prev.rowParams[rowId] || new Set();
+                const allSelected = available.every(p => current.has(p));
+                const next = new Set(current);
+                if (allSelected) available.forEach(p => next.delete(p)); else available.forEach(p => next.add(p));
+                return { ...prev, rowParams: { ...prev.rowParams, [rowId]: next } };
+            });
+            const toggleGroupForRow = (rowId, group, rowParams) => {
+                const paramsInGroup = rowParams.filter(p => getDeviceGroup(p) === group);
+                if (paramsInGroup.length === 0) return;
+                setSelection(prev => {
+                    const current = prev.rowParams[rowId] || new Set();
+                    const allInGroupSelected = paramsInGroup.every(p => current.has(p));
+                    const next = new Set(current);
+                    if (allInGroupSelected) paramsInGroup.forEach(p => next.delete(p)); else paramsInGroup.forEach(p => next.add(p));
+                    return { ...prev, rowParams: { ...prev.rowParams, [rowId]: next } };
+                });
+            };
+            const toggleChemSet = (rowId, type, rowParams) => {
+                let target = [];
+                if (type === 'P') target = rowParams.filter(p => p.toUpperCase().includes('PPO4IC') || p.toUpperCase().includes('PPGESICP'));
+                else if (type === 'S') target = rowParams.filter(p => p.toUpperCase().includes('SSGESICP') || p.toUpperCase().includes('SSO4IC'));
+                else if (type === 'N') target = rowParams.filter(p => p.toUpperCase().includes('NNGESTOC') || p.toUpperCase().includes('NNH4IC') || p.toUpperCase().includes('NNO2IC') || p.toUpperCase().includes('NNO3IC') || p.toUpperCase().includes('CGES'));
+                if (target.length === 0) return;
+                setSelection(prev => {
+                    // Logic: DESELECT everything else and SELECT only these (exclusive selection)
+                    const next = new Set();
+                    target.forEach(p => next.add(p));
+                    return { ...prev, rowParams: { ...prev.rowParams, [rowId]: next } };
+                });
+            };
+            const getGroupLabel = (g) => g === 'ICP-OES' ? 'ICP' : (g === 'pH-LF-TIT' ? 'TIT' : g);
+
+            return (
+                <div className="bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col h-[calc(100vh-12rem)]">
+                    <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center flex-shrink-0">
+                        <div><h3 className="font-semibold text-slate-800">Proben & Parameter Auswahl</h3><p className="text-xs text-slate-500 mt-1">Proben aktivieren, um Parameter zu sehen. Parameter sind standardmäßig alle aktiv.</p></div>
+                        <button onClick={toggleAllRows} className="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1 border border-blue-200 rounded bg-blue-50">{selection.selectedRowIds.size === dataset.data.length ? 'Alle Proben abwählen' : 'Alle Proben auswählen'}</button>
+                    </div>
+                    <div className="p-0 overflow-y-auto flex-grow bg-white">
+                        <div className="divide-y divide-slate-100">
+                            {dataset.data.map(row => {
+                                const isRowSelected = selection.selectedRowIds.has(row.id);
+                                const available = rowAvailableParams[row.id] || [];
+                                const selected = selection.rowParams[row.id] || new Set();
+                                const selectedCount = available.filter(p => selected.has(p)).length;
+                                const groupsInRow = Array.from(new Set(available.map(p => getDeviceGroup(p)))).sort((a, b) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b));
+                                return (
+                                    <div key={row.id} className={`flex flex-col border-b border-slate-100 last:border-0 ${isRowSelected ? 'bg-blue-50/10' : 'opacity-60 bg-slate-50'}`}>
+                                        <div className="flex items-center px-4 py-3 gap-4">
+                                            <div onClick={() => toggleRow(row.id)} className="cursor-pointer flex items-center gap-2 flex-shrink-0 w-48">
+                                                <div className={`${isRowSelected ? 'text-blue-600' : 'text-slate-300'}`}>{isRowSelected ? <CheckSquare className="w-5 h-5"/> : <Square className="w-5 h-5"/>}</div>
+                                                <div className="flex flex-col"><span className={`text-sm font-bold ${isRowSelected ? 'text-slate-900' : 'text-slate-500'}`}>{row.sampleId}</span><span className="text-[10px] text-slate-400">{row.isRepeat ? 'Wiederholung' : ''}</span></div>
+                                            </div>
+                                            {isRowSelected && (
+                                                <div className="flex flex-col gap-1 mr-2 border-r border-slate-100 pr-2">
+                                                    <div className="flex gap-1">
+                                                        {groupsInRow.map(g => {
+                                                            const paramsInGroup = available.filter(p => getDeviceGroup(p) === g);
+                                                            const allInGroupSelected = paramsInGroup.every(p => selected.has(p));
+                                                            return <button key={g} onClick={(e) => { e.stopPropagation(); toggleGroupForRow(row.id, g, available); }} className={`text-[9px] px-1.5 py-0.5 rounded border uppercase font-bold tracking-wider transition-colors w-10 text-center ${allInGroupSelected ? 'bg-slate-700 text-white border-slate-700 hover:bg-slate-600' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400 hover:text-slate-600'}`} title={`Gruppe ${g} umschalten`}>{getGroupLabel(g)}</button>
+                                                        })}
+                                                    </div>
+                                                    <div className="flex gap-1 mt-0.5">{['P', 'S', 'N'].map(t => <button key={t} onClick={(e) => { e.stopPropagation(); toggleChemSet(row.id, t, available); }} className="text-[9px] px-1.5 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-800 font-bold hover:bg-orange-100 w-6 text-center" title={`Nur ${t}-Parameter auswählen`}>{t}</button>)}</div>
+                                                </div>
+                                            )}
+                                            {isRowSelected && (
+                                                <div className="flex-grow flex items-center gap-2">
+                                                    <button onClick={(e) => { e.stopPropagation(); toggleAllParamsForRow(row.id, available); }} className="text-[10px] font-bold text-slate-400 hover:text-blue-600 mr-2 uppercase tracking-wider flex-shrink-0" title={selectedCount === available.length ? 'Alle abwählen' : 'Alle auswählen'}>{selectedCount === available.length ? <X className="w-3 h-3"/> : <Check className="w-3 h-3"/>}</button>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {available.length > 0 ? available.map(param => {
+                                                            const isParamSelected = selected.has(param);
+                                                            return <button key={param} onClick={(e) => { e.stopPropagation(); toggleRowParam(row.id, param); }} className={`px-2 py-0.5 text-[10px] font-medium rounded border transition-all ${isParamSelected ? `${getParamColor(param)} shadow-sm` : 'bg-white text-slate-300 border-slate-100 hover:bg-slate-50 line-through decoration-slate-300'}`} title={param}>{formatParamName(param)}</button>
+                                                        }) : <span className="text-xs text-slate-300 italic">Keine Parameter</span>}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                    <div className="p-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 text-center">{selection.selectedRowIds.size} Proben ausgewählt</div>
+                </div>
+            );
+        };
+
+        // 6. ReportView
+        const ReportView = ({ dataset, selection, comments }) => {
+            const GROUP_ORDER = ['pH-LF-TIT', 'TOC', 'IC', 'ICP-OES', 'Sonstige'];
+            const getDeviceGroup = (header) => {
+                const h = header.toUpperCase();
+                if (h.includes('TIT') || h.includes('M1.') || h.includes('M3.') || h.includes('M8.') || h.includes('HH+PHM') || h.includes('LFLFM')) return 'pH-LF-TIT';
+                if (h.includes('TOC')) return 'TOC';
+                if (h.includes('ICP')) return 'ICP-OES'; 
+                if (h.includes('IC')) return 'IC';
+                return 'Sonstige';
+            };
+            const getBaseName = (header) => header.replace(/\d+\.\d+$/, '');
+
+            const reportData = useMemo(() => {
+                const pattern = /(ICP|IC|TOC|TIT|M\d+\.|HH\+PHM|LFLFM)/;
+                const allRelevantHeaders = dataset.resultHeaders.filter(h => pattern.test(h.toUpperCase()));
+                const groupedHeaders = { 'pH-LF-TIT': [], 'TOC': [], 'IC': [], 'ICP-OES': [], 'Sonstige': [] };
+                allRelevantHeaders.forEach(h => groupedHeaders[getDeviceGroup(h)].push(h));
+                Object.keys(groupedHeaders).forEach(k => {
+                    // All groups including IC sorted alphabetically
+                    groupedHeaders[k].sort((a, b) => a.localeCompare(b, 'de'));
+                });
+                const orderedHeaders = [];
+                GROUP_ORDER.forEach(g => groupedHeaders[g].forEach(h => orderedHeaders.push({ name: h, group: g, baseName: getBaseName(h) })));
+                const selectedRows = dataset.data.filter(r => selection.selectedRowIds.has(r.id)).sort((a, b) => {
+                    const sc = a.seriesId.localeCompare(b.seriesId, undefined, { numeric: true });
+                    if (sc !== 0) return sc;
+                    const ic = a.sampleId.localeCompare(b.sampleId, undefined, { numeric: true });
+                    if (ic !== 0) return ic;
+                    return (Number(a.isRepeat) - Number(b.isRepeat));
+                });
+                return { headers: orderedHeaders, rows: selectedRows };
+            }, [dataset, selection.selectedRowIds]);
+
+            const getRowColorClass = (rowId) => {
+                const s = Array.from(selection.rowParams[rowId] || []);
+                if (s.length === 0) return { className: 'bg-white', hexColor: 'FFFFFF' };
+                const has = (partial) => s.some(c => c.toUpperCase().includes(partial.toUpperCase()));
+                const hasTOC = has('TOC'), hasIC = has('IC'), hasICP = has('ICP'), hasPH = has('TIT') || has('M1.') || has('M3.') || has('M8.') || has('HH+PHM') || has('LFLFM');
+                
+                const isYellow = s.length > 0 && s.every(c => c.toUpperCase().includes('PPO4IC') || c.toUpperCase().includes('PPGESICP'));
+                if (isYellow) return { className: 'bg-yellow-100 border-l-4 border-l-yellow-500', hexColor: 'FFFFCC' };
+                const isOrange = s.length > 0 && s.every(c => c.toUpperCase().includes('SSO4IC') || c.toUpperCase().includes('SSGESICP'));
+                if (isOrange) return { className: 'bg-orange-100 border-l-4 border-l-orange-500', hexColor: 'FFDDBB' };
+                const isPink = s.length > 0 && s.every(c => c.toUpperCase().includes('NNGESTOC') || c.toUpperCase().includes('NNH4IC') || c.toUpperCase().includes('NNO2IC') || c.toUpperCase().includes('NNO3IC') || c.toUpperCase().includes('CGES'));
+                if (isPink) return { className: 'bg-pink-100 border-l-4 border-l-pink-500', hexColor: 'FFCCFF' };
+                if (hasPH && !hasTOC && !hasIC && !hasICP) return { className: 'bg-purple-100 border-l-4 border-l-purple-500', hexColor: 'E6CCFF' };
+                if (hasTOC && hasIC && !hasICP && !hasPH) return { className: 'bg-red-100 border-l-4 border-l-red-500', hexColor: 'FFCCCC' };
+                if (hasIC && hasICP && !hasTOC && !hasPH) return { className: 'bg-blue-100 border-l-4 border-l-blue-500', hexColor: 'CCE5FF' };
+                if (hasTOC && hasIC && hasICP) return { className: 'bg-green-100 border-l-4 border-l-green-500', hexColor: 'CCFFCC' };
+                return { className: 'bg-white', hexColor: 'FFFFFF' };
+            };
+            const isCellActive = (row, base, full) => (selection.rowParams[row.id]?.has(base)) && (row.results[full] && row.results[full].trim() !== '');
+
+            const handleExcelExport = () => {
+                const wb = XLSX.utils.book_new();
+                const headerRow = ["Serie", "Probe", "Wdh.", ...reportData.headers.map(h => h.name)];
+                const dataRows = [];
+                // Arial Font styles
+                const styleHeader = { font: { name: "Arial", bold: true }, fill: { fgColor: { rgb: "EEEEEE" } }, border: { bottom: { style: "thin" } } };
+                const styleDefault = { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFFFFF" } } };
+                const styleX = { font: { name: "Arial", color: { rgb: "FF0000" } }, alignment: { horizontal: "center" } };
+                
+                dataRows.push(headerRow.map(h => ({ v: h, s: styleHeader })));
+                let currentRowIndex = 1;
+                reportData.rows.forEach(row => {
+                    const colorStyle = getRowColorClass(row.id);
+                    const styleRowColor = { font: { name: "Arial" }, fill: { fgColor: { rgb: colorStyle.hexColor } } };
+                    const isRepeatStr = row.isRepeat ? "2" : "1";
+                    const row1 = [{ v: row.seriesId, s: styleRowColor }, { v: row.sampleId, s: styleRowColor }, { v: isRepeatStr, s: styleRowColor }];
+                    reportData.headers.forEach(h => { const val = row.results[h.name]; const numVal = parseFloat(val.replace(',', '.')); row1.push({ v: isNaN(numVal) ? val : numVal, t: isNaN(numVal) ? 's' : 'n', s: styleRowColor }); });
+                    dataRows.push(row1);
+                    const row2 = [{ v: "", s: styleDefault }, { v: "Neu:", s: { font: { name: "Arial", italic: true } } }, { v: "", s: styleDefault }];
+                    reportData.headers.forEach(h => { const active = isCellActive(row, h.baseName, h.name); if (!active) row2.push({ v: "x", s: { ...styleX, border: { bottom: { style: "thin" } } } }); else row2.push({ v: "", s: { font: { name: "Arial" }, border: { bottom: { style: "thin" } } } }); });
+                    dataRows.push(row2);
+                    const row3 = [{ v: "", s: styleDefault }, { v: "Abw. %:", s: { font: { name: "Arial", italic: true } } }, { v: "", s: styleDefault }];
+                    reportData.headers.forEach((_, colIdx) => { const excelCol = XLSX.utils.encode_col(colIdx + 3); const oldRef = `${excelCol}${currentRowIndex + 1}`; const newRef = `${excelCol}${currentRowIndex + 2}`; row3.push({ t: 'n', f: `IF(ISBLANK(${newRef}),"",(${newRef}-${oldRef})/${oldRef})`, z: '0.00%', s: { font: { name: "Arial", color: { rgb: "666666" } } } }); });
+                    dataRows.push(row3);
+                    dataRows.push([]); currentRowIndex += 4;
+                });
+                
+                // Footer: Legend + Work Table side-by-side
+                const legendItems = [
+                    { v: "Legende Farbmarkierung:", s: { font: { name: "Arial", bold: true } } },
+                    { v: "Nur P (PO4+Pges)", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFFFCC" } } } },
+                    { v: "Nur S (SO4+Sges)", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFDDBB" } } } },
+                    { v: "N+TC (TOC+IC)", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFCCFF" } } } },
+                    { v: "TOC + IC", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFCCCC" } } } },
+                    { v: "IC + ICP", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "CCE5FF" } } } },
+                    { v: "Alle Gruppen", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "CCFFCC" } } } },
+                    { v: "Nur pH-LF-TIT", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "E6CCFF" } } } }
+                ];
+
+                const tableHeader = [
+                    { v: "Gerätegruppe", s: styleHeader }, 
+                    { v: "Erledigt von", s: styleHeader }, 
+                    { v: "Datum", s: styleHeader }
+                ];
+                
+                const tableRows = [];
+                GROUP_ORDER.forEach(g => {
+                    if (g !== 'Sonstige') {
+                        tableRows.push([
+                            { v: g, s: { font: { name: "Arial" }, border: { right: { style: "thin" } } } }, 
+                            { v: "", s: { font: { name: "Arial" }, border: { bottom: { style: "thin" } } } }, 
+                            { v: "", s: { font: { name: "Arial" }, border: { bottom: { style: "thin" } } } }
+                        ]);
+                    }
+                });
+
+                dataRows.push([]); // Spacer row before footer
+
+                const maxFooterRows = Math.max(legendItems.length, tableRows.length + 1);
+
+                for (let i = 0; i < maxFooterRows; i++) {
+                    const row = [];
+                    // Col 0: Legend
+                    if (i < legendItems.length) row[0] = legendItems[i]; else row[0] = { v: "" };
+                    // Col 1-2: Spacer
+                    row[1] = { v: "" }; row[2] = { v: "" };
+                    // Col 3-5: Table (Excel Columns D, E, F)
+                    if (i === 0) { row[3] = tableHeader[0]; row[4] = tableHeader[1]; row[5] = tableHeader[2]; }
+                    else if (i <= tableRows.length) { const tRow = tableRows[i-1]; row[3] = tRow[0]; row[4] = tRow[1]; row[5] = tRow[2]; }
+                    dataRows.push(row);
+                }
+
+                dataRows.push([]);
+                dataRows.push([{ v: "Nach Eintragen der letzten noch ausstehenden Messergebnisse bitte in den Ordner \"Nachmessungen fertig\" auf G schieben! … und Theo bitte Bescheid geben, dass die Nachmessungen abgeschlossen sind.", s: { font: { name: "Arial", bold: true, color: { rgb: "FF0000" } }, fill: { fgColor: { rgb: "FFFF00" } } } }]);
+                
+                const ws = XLSX.utils.aoa_to_sheet(dataRows);
+                const wscols = [{ wch: 10 }, { wch: 15 }, { wch: 5 }]; reportData.headers.forEach(() => wscols.push({ wch: 12 })); ws['!cols'] = wscols;
+                XLSX.utils.book_append_sheet(wb, ws, "Nachmessung");
+
+                // IB Sheet
+                const ibHeaders = ["Probenkennung", "WDH", "Alkalinität", "Corg berechnet", "Leitfähigkeit", "Quotient ELF_eu_korr", "Quotient Kationen Anionen NFV", "Theo elekt Leit (EU) korr", "Q. LF/Theo (ber.)", "Bemerkung", "Kommentar"];
+                const h = dataset.resultHeaders;
+                const colAlk = h.find(x => x.toLowerCase().startsWith('alkalinität-gran'))||''; const colCorg = h.find(x => x==='Corg berechnet')||''; const colCond31 = h.find(x => x==='LFLFLFM3.1')||''; const colCond13 = h.find(x => x==='LFLFLFM1.3')||''; const colQElf = h.find(x => x==='Quotient ELF_eu_korr')||''; const colQIon = h.find(x => x==='Quotient Kationen Anionen NFV')||''; const colTheo = h.find(x => x==='Theo elekt Leit (EU) korr')||'';
+                const ibSorted = [...dataset.data].sort((a,b)=>a.sampleId.localeCompare(b.sampleId, undefined, {numeric:true, sensitivity:'base'}) || (Number(a.isRepeat)-Number(b.isRepeat)));
+                const ibRows = [ibHeaders.map(v => ({ v: v, s: styleHeader }))];
+                ibSorted.forEach(row => {
+                    const valAlk = colAlk ? row.results[colAlk] : ''; const valC = colCorg ? row.results[colCorg] : '';
+                    const numCorg = parseGermanFloat(valC); // Fixed: Defined numCorg
+                    
+                    let valCond = '', isFallback = false; const v31 = colCond31 ? row.results[colCond31] : ''; const v13 = colCond13 ? row.results[colCond13] : '';
+                    if (v31 && v31.trim() !== '') valCond = v31; else if (v13 && v13.trim() !== '') { valCond = v13; isFallback = true; }
+                    const valQE = colQElf ? row.results[colQElf] : ''; const valQI = colQIon ? row.results[colQIon] : ''; const valT = colTheo ? row.results[colTheo] : '';
+                    
+                    const nQI = parseGermanFloat(valQI); 
+                    const nCond = parseGermanFloat(valCond); const nTheo = parseGermanFloat(valT);
+                    const nQElf = parseGermanFloat(valQE);
+
+                    // Rounding Logic
+                    const rQI = !isNaN(nQI) ? parseFloat(nQI.toFixed(2)) : NaN;
+                    
+                    const isIbOk = !isNaN(rQI) && rQI >= 0.9 && rQI <= 1.1;
+
+                    let isLfOk = false, cQ = NaN;
+                    if (!isNaN(nCond) && !isNaN(nTheo) && nTheo !== 0) {
+                        cQ = nCond / nTheo;
+                        if (nCond > 20) isLfOk = cQ >= 0.9 && cQ <= 1.1; else if (nCond >= 10) isLfOk = cQ >= 0.8 && cQ <= 1.2; else isLfOk = cQ >= 0.7 && cQ <= 1.3;
+                    }
+                    let bem = "";
+                    if (!row.isRepeat) {
+                        if (!isNaN(rQI) && !isNaN(cQ)) { if (isIbOk && isLfOk) bem = "ok"; else if (isIbOk && !isLfOk) bem = "IB ok, LF nicht"; else if (!isIbOk && isLfOk) bem = "IB nicht ok ; LF ok"; else bem = "IB nicht ok + LF nicht ok"; } else if (!isNaN(rQI)) bem = isIbOk ? "IB ok" : "IB nicht ok";
+                    }
+                    
+                    // --- Auto Comment Logic ---
+                    let autoComment = "";
+                    if (!row.isRepeat) {
+                        const isDeviation = !isIbOk || !isLfOk;
+
+                        // Prio 1: Corg > 20
+                        if (isDeviation && !isNaN(numCorg) && numCorg > 20) {
+                            autoComment = "Corg>20";
+                        }
+                        // Prio 2: Spezifischer Fall
+                        // Entfernt: && !isIbOk
+                        else if (isDeviation && !isNaN(numCorg) && numCorg > 10 && !isNaN(nCond) && nCond < 50) {
+                            autoComment = "Corg>10 LTF<50";
+                        }
+                        // Prio 3: Hohe Leitfähigkeit
+                        else if (!isNaN(nCond) && nCond > 300 && !isLfOk) {
+                            autoComment = "gilt nur für Ideal verdünnte Lösungen";
+                        }
+                        // Prio 4: Niedrige Leitfähigkeit
+                        else if (isDeviation && !isNaN(nCond) && nCond < 30) {
+                            autoComment = "Leitfähigkeit < 30";
+                        }
+                    }
+
+                    const condStyle = isFallback ? { font: { name: "Arial", color: { rgb: "FF0000" } } } : { font: { name: "Arial" } };
+                    const bemStyle = bem === 'ok' ? { font: { name: "Arial" }, fill: { fgColor: { rgb: "CCFFCC" } } } : (bem ? { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFCCCC" } } } : { font: { name: "Arial" } });
+                    const defaultStyle = { font: { name: "Arial" } };
+                    
+                    ibRows.push([
+                        {v:row.sampleId, s:defaultStyle},
+                        {v:row.isRepeat?"ja":"nein", s:defaultStyle},
+                        {v:valAlk, s:defaultStyle},
+                        {v:valC, s:defaultStyle},
+                        {v:valCond,s:condStyle},
+                        {v:formatGermanFloat(nQElf, 2), s:defaultStyle},
+                        {v:formatGermanFloat(rQI, 2), s:defaultStyle},
+                        {v:formatGermanFloat(nTheo, 1), s:defaultStyle},
+                        {v:formatGermanFloat(cQ, 2), s:defaultStyle},
+                        {v:bem,s:bemStyle},
+                        {v:comments[row.id]||"", s:defaultStyle}
+                    ]);
+                });
+                const wsIB = XLSX.utils.aoa_to_sheet(ibRows); XLSX.utils.book_append_sheet(wb, wsIB, "Ionenbilanz");
+                XLSX.writeFile(wb, `Nachmessung_${dataset.fileName.replace('.csv', '')}.xlsx`);
+            };
+
+            if (reportData.rows.length === 0 || reportData.headers.length === 0) return <div className="flex flex-col items-center justify-center h-64 text-slate-400 bg-white rounded-lg border border-slate-200 m-4"><p>Bitte wählen Sie im Tab "Auswahl" Proben aus.</p></div>;
+
+            return (
+                <div className="space-y-4 h-full flex flex-col">
+                    <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between flex-shrink-0">
+                        <div><h3 className="font-medium text-slate-900">Nachmessung Export Vorschau</h3><p className="text-xs text-slate-500">Farbcode basierend auf individueller Auswahl. 'x' markiert nicht ausgewählte oder leere Parameter.</p></div>
+                        <button onClick={handleExcelExport} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium"><Download className="w-4 h-4"/> Als XLSX exportieren</button>
+                    </div>
+                    <div className="flex-grow bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden flex flex-col">
+                        <div className="overflow-x-auto overflow-y-auto flex-grow p-4">
+                            <div className="flex flex-wrap gap-4 mb-4 text-xs">
+                                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-yellow-100 border border-yellow-500"></div> P (PO4+Pges)</div>
+                                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-orange-100 border border-orange-500"></div> S (SO4+Sges)</div>
+                                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-pink-100 border border-pink-500"></div> N+TC (TOC+IC)</div>
+                                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-red-100 border border-red-500"></div> TOC+IC</div>
+                                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-blue-100 border border-blue-500"></div> IC+ICP</div>
+                                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-green-100 border border-green-500"></div> Alle</div>
+                                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-purple-100 border border-purple-500"></div> pH-LF-TIT</div>
+                            </div>
+                            <table className="w-full text-sm text-left whitespace-nowrap border-collapse">
+                                <thead><tr><th className="border p-2 bg-slate-100 font-bold min-w-[80px]">Serie</th><th className="border p-2 bg-slate-100 font-bold min-w-[100px]">Probe</th><th className="border p-2 bg-slate-100 font-bold w-12 text-center">Wdh</th>{reportData.headers.map(h => (<th key={h.name} className="border p-2 bg-slate-100 text-blue-800 font-medium min-w-[100px]"><div className="text-[10px] text-slate-500">{h.group}</div>{h.name}</th>))}</tr></thead>
+                                <tbody>
+                                    {reportData.rows.map(row => {
+                                        const colorStyle = getRowColorClass(row.id);
+                                        return (
+                                            <React.Fragment key={row.id}>
+                                                <tr className={`${colorStyle.className}`}><td className="border p-2 font-medium">{row.seriesId}</td><td className="border p-2">{row.sampleId}</td><td className="border p-2 text-center">{row.isRepeat?'2':'1'}</td>{reportData.headers.map(h => (<td key={h.name} className="border p-2 text-right">{row.results[h.name]}</td>))}</tr>
+                                                <tr className="bg-slate-50/50"><td colSpan={3} className="border p-2 text-right text-xs italic text-slate-500">Neuer Wert:</td>{reportData.headers.map(h => { const active = isCellActive(row, h.baseName, h.name); return <td key={h.name} className="border p-2 bg-white text-center text-red-500 font-bold">{active ? <div className="h-4 border-b border-slate-300"></div> : "x"}</td> })}</tr>
+                                                <tr className="bg-slate-50/50"><td colSpan={3} className="border p-2 text-right text-xs italic text-slate-500">Abweichung %:</td>{reportData.headers.map(h => (<td key={h.name} className="border p-2 text-right text-xs text-slate-400">(Formel)</td>))}</tr>
+                                                <tr><td colSpan={3 + reportData.headers.length} className="h-4 bg-slate-100"></td></tr>
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                            <div className="mt-8 max-w-2xl"><div className="p-4 bg-yellow-200 text-red-600 font-bold border border-yellow-300">Nach Eintragen der letzten noch ausstehenden Messergebnisse bitte in den Ordner "Nachmessungen fertig" auf G schieben! … und Theo bitte Bescheid geben, dass die Nachmessungen abgeschlossen sind.</div></div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- APP ---
+        function App() {
+            const [activeTab, setActiveTab] = useState(AppTab.IMPORT);
+            const [parsedData, setParsedData] = useState(null);
+            const [isLoading, setIsLoading] = useState(false);
+            const [error, setError] = useState(null);
+            const [showSuccessMsg, setShowSuccessMsg] = useState(false);
+            const [selection, setSelection] = useState({ selectedRowIds: new Set(), rowParams: {} });
+            const [comments, setComments] = useState({});
+
+            const getBaseParamName = (header) => header.replace(/\d+\.\d+$/, '');
+
+            const handleFileSelect = async (file) => {
+                setIsLoading(true); setError(null); setShowSuccessMsg(false);
+                try {
+                    const data = await parseLabDataCsv(file);
+                    setParsedData(data);
+                    const initialRowIds = new Set();
+                    const initialRowParams = {};
+                    setComments({});
+                    data.data.forEach(row => {
+                        const rowParamSet = new Set();
+                        data.resultHeaders.forEach(header => {
+                            const val = row.results[header];
+                            if (val && val.trim() !== '') {
+                                const baseName = getBaseParamName(header);
+                                rowParamSet.add(baseName);
+                            }
+                        });
+                        initialRowParams[row.id] = rowParamSet;
+                    });
+                    setSelection({ selectedRowIds: initialRowIds, rowParams: initialRowParams });
+                    setIsLoading(false); setShowSuccessMsg(true);
+                    setTimeout(() => { setShowSuccessMsg(false); setActiveTab(AppTab.RAW_DATA); }, 1500);
+                } catch (err) {
+                    console.error(err); setError(err.message || "Unbekannter Fehler beim Parsen."); setIsLoading(false);
+                }
+            };
+
+            const renderContent = () => {
+                switch (activeTab) {
+                    case AppTab.IMPORT: return <div className="flex flex-col items-center justify-center min-h-[50vh]"><FileUpload onFileSelect={handleFileSelect} isLoading={isLoading} error={error} />{showSuccessMsg && <div className="mt-6 flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-full animate-fade-in-up"><CheckCircle2 className="w-5 h-5" /><span className="font-medium">Datei erfolgreich eingelesen! Wechsel zu Rohdaten...</span></div>}</div>;
+                    case AppTab.RAW_DATA: return parsedData ? <RawDataViewer dataset={parsedData} /> : null;
+                    case AppTab.ION_BALANCE: return parsedData ? <IonBalanceAnalysis dataset={parsedData} comments={comments} setComments={setComments} /> : null;
+                    case AppTab.SELECTION: return parsedData ? <DataSelection dataset={parsedData} selection={selection} setSelection={setSelection} /> : null;
+                    case AppTab.REPORT: return parsedData ? <ReportView dataset={parsedData} selection={selection} comments={comments} /> : null;
+                    case AppTab.EXPORT: return <div className="flex flex-col items-center justify-center h-96 text-slate-400 bg-white rounded-lg border border-slate-200 border-dashed m-4"><p className="text-lg font-medium">Sonstiger Export</p><p className="text-sm">Für die spezielle Nachmessungs-Tabelle bitte den Tab "Nachmessung" verwenden.</p></div>;
+                    default: return null;
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-50 flex flex-col">
+                    <header className="bg-white border-b border-slate-200">
+                        <div className="max-w-[95%] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                            <div className="flex items-center gap-2"><div className="bg-blue-600 w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-lg">L</div><h1 className="text-xl font-bold text-slate-900 tracking-tight">LabData Manager</h1></div>
+                        </div>
+                    </header>
+                    <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} isDataLoaded={!!parsedData} />
+                    <main className="flex-grow max-w-[95%] mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">{renderContent()}</main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
