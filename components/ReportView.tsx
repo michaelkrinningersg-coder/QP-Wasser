@@ -238,7 +238,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ dataset, selection, comm
 
     // --- Footer Section: Legend + Work Table side-by-side ---
     
-    // Define Legend Items (Col 0)
+    // Define Legend Items (Col 0 and 1 merged)
     const legendItems = [
         { v: "Legende Farbmarkierung:", s: { font: { name: "Arial", bold: true } } },
         { v: "Nur P (PO4+Pges)", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFFFCC" } } } },
@@ -250,7 +250,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ dataset, selection, comm
         { v: "Nur pH-LF-TIT", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "E6CCFF" } } } }
     ];
 
-    // Define Table Items (Cols 3, 4, 5 corresponding to D, E, F)
+    // Define Table Items (Cols 3-4 merged, 5, 6 corresponding to D-E, F, G)
     const tableHeader = [
         { v: "Gerätegruppe", s: styleHeader }, 
         { v: "Erledigt von", s: styleHeader }, 
@@ -269,47 +269,75 @@ export const ReportView: React.FC<ReportViewProps> = ({ dataset, selection, comm
     });
 
     dataRows.push([]); // Spacer row before footer
+    const footerStartRow = dataRows.length;
 
     const maxFooterRows = Math.max(legendItems.length, tableRows.length + 1);
+    const merges: any[] = [];
 
     for (let i = 0; i < maxFooterRows; i++) {
         const row: any[] = [];
+        const currentRowIndex = footerStartRow + i;
         
-        // Col 0: Legend
+        // Col 0-1: Legend (Merged)
         if (i < legendItems.length) {
             row[0] = legendItems[i];
+            row[1] = { v: "", s: legendItems[i].s }; // Apply same style to merged cell
+            merges.push({ s: { r: currentRowIndex, c: 0 }, e: { r: currentRowIndex, c: 1 } });
         } else {
             row[0] = { v: "" };
+            row[1] = { v: "" };
         }
 
-        // Col 1-2: Spacer
-        row[1] = { v: "" };
+        // Col 2: Spacer
         row[2] = { v: "" };
 
-        // Col 3-5: Table (Excel Columns D, E, F)
+        // Col 3-6: Table (Excel Columns D-E, F, G)
         if (i === 0) {
             // Table Header
             row[3] = tableHeader[0];
-            row[4] = tableHeader[1];
-            row[5] = tableHeader[2];
+            row[4] = { v: "", s: tableHeader[0].s }; // Merged part of Gerätegruppe
+            merges.push({ s: { r: currentRowIndex, c: 3 }, e: { r: currentRowIndex, c: 4 } });
+            
+            row[5] = tableHeader[1];
+            row[6] = tableHeader[2];
         } else if (i <= tableRows.length) {
             // Table Body
             const tRow = tableRows[i-1];
             row[3] = tRow[0];
-            row[4] = tRow[1];
-            row[5] = tRow[2];
+            row[4] = { v: "", s: tRow[0].s }; // Merged part of Gerätegruppe
+            merges.push({ s: { r: currentRowIndex, c: 3 }, e: { r: currentRowIndex, c: 4 } });
+            
+            row[5] = tRow[1];
+            row[6] = tRow[2];
         }
 
         dataRows.push(row);
     }
 
     dataRows.push([]);
-    dataRows.push([{ v: "Nach Eintragen der letzten noch ausstehenden Messergebnisse bitte in den Ordner \"Nachmessungen fertig\" auf G schieben! … und Theo bitte Bescheid geben, dass die Nachmessungen abgeschlossen sind.", s: { font: { name: "Arial", bold: true, color: { rgb: "FF0000" } }, fill: { fgColor: { rgb: "FFFF00" } } } }]);
+    const finalNoteRowIndex = dataRows.length;
+    dataRows.push([{ 
+        v: "Nach Eintragen der letzten noch ausstehenden Messergebnisse bitte in den Ordner \"Nachmessungen fertig\" auf G schieben!\n… und Theo bitte Bescheid geben, dass die Nachmessungen abgeschlossen sind.", 
+        s: { 
+            font: { name: "Arial", bold: true, color: { rgb: "FF0000" } }, 
+            fill: { fgColor: { rgb: "FFFF00" } },
+            alignment: { wrapText: true, vertical: "center" }
+        } 
+    }]);
+    merges.push({ s: { r: finalNoteRowIndex, c: 0 }, e: { r: finalNoteRowIndex, c: 7 } }); // Spalten 1-8 (Index 0-7)
 
     const ws = XLSX.utils.aoa_to_sheet(dataRows);
+    
+    // Set row height for the final note to accommodate two lines
+    if (!ws['!rows']) ws['!rows'] = [];
+    ws['!rows'][finalNoteRowIndex] = { hpt: 30 }; // Set height to ~30 points for two lines
+
     const wscols = [{ wch: 10 }, { wch: 15 }, { wch: 5 }];
     reportData.headers.forEach(() => wscols.push({ wch: 12 }));
     ws['!cols'] = wscols;
+    if (merges.length > 0) {
+        ws['!merges'] = merges;
+    }
     XLSX.utils.book_append_sheet(wb, ws, "Nachmessung");
 
     // --- Sheet 2: Ionenbilanz (Calculated) ---

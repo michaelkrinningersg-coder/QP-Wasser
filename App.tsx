@@ -149,7 +149,7 @@ function App() {
             <div className="bg-blue-600 w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-lg">
               L
             </div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">QP-Wasser Version 0.2.2</h1>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">QP-Wasser Version 0.2.3</h1>
           </div>
         </div>
       </header>
@@ -159,7 +159,6 @@ function App() {
         onTabChange={setActiveTab} 
         isDataLoaded={!!parsedData}
       />
-
       <main className="flex-grow max-w-[95%] mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         {renderContent()}
       </main>
