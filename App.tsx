@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { TabNavigation } from './components/TabNavigation';
 import { FileUpload } from './components/FileUpload';
 import { RawDataViewer } from './components/RawDataViewer';
@@ -84,99 +84,6 @@ function App() {
     }
   };
 
-  // NEU: Funktion zum Speichern in die Cloud
-  const saveToCloud = async (showSuccessAlert = true) => {
-    if (!parsedData) {
-      if (showSuccessAlert) alert("Keine Daten zum Speichern vorhanden!");
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/saveState', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          parsedData,
-          comments,
-          selection: {
-            ...selection,
-            // Set in Array umwandeln für JSON
-            selectedRowIds: Array.from(selection.selectedRowIds)
-          }
-        })
-      });
-
-      if (response.ok) {
-        if (showSuccessAlert) alert('Stand erfolgreich für alle in der Cloud gespeichert!');
-      } else {
-        if (showSuccessAlert) alert('Fehler beim Speichern.');
-      }
-    } catch (error) {
-      console.error("Cloud Save Error:", error);
-      if (showSuccessAlert) alert('Netzwerkfehler beim Speichern.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // NEU: Funktion zum Laden aus der Cloud
-  const loadFromCloud = async (showSuccessAlert = false) => {
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/getState');
-      if (!response.ok) {
-        if (showSuccessAlert) alert('Kein gespeicherter Stand gefunden oder Fehler beim Laden.');
-        setIsLoading(false);
-        return;
-      }
-
-      const data = await response.json();
-      
-      setParsedData(data.parsedData);
-      setComments(data.comments || {});
-      
-      // Array zurück in Set umwandeln
-      const newSelection = {
-        ...data.selection,
-        selectedRowIds: new Set(data.selection.selectedRowIds)
-      };
-      
-      // rowParams Sets wiederherstellen
-      if (data.selection.rowParams) {
-        Object.keys(data.selection.rowParams).forEach(rowId => {
-          newSelection.rowParams[rowId] = new Set(data.selection.rowParams[rowId]);
-        });
-      }
-      
-      setSelection(newSelection);
-      
-      if (showSuccessAlert) alert('Stand erfolgreich aus der Cloud geladen!');
-      setActiveTab(AppTab.RAW_DATA);
-    } catch (error) {
-      console.error("Cloud Load Error:", error);
-      if (showSuccessAlert) alert('Netzwerkfehler beim Laden.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // NEU: Automatisches Laden beim Start
-  useEffect(() => {
-    loadFromCloud(false); // Lade ohne Alert-Popups beim Start
-  }, []);
-
-  // NEU: Automatisches Speichern alle 120 Sekunden
-  useEffect(() => {
-    if (!parsedData) return; // Nur speichern, wenn Daten vorhanden sind
-
-    const intervalId = setInterval(() => {
-      saveToCloud(false); // Speichern ohne Alert-Popups
-    }, 120000); // 120.000 Millisekunden = 120 Sekunden
-
-    return () => clearInterval(intervalId); // Cleanup beim Unmounten
-  }, [parsedData, selection, comments]); // Abhängigkeiten, damit immer der aktuellste State gespeichert wird
-
   const renderContent = () => {
     switch (activeTab) {
       case AppTab.IMPORT:
@@ -243,24 +150,6 @@ function App() {
               L
             </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">QP-Wasser Version 0.2.4</h1>
-          </div>
-          
-          {/* NEU: Cloud Buttons */}
-          <div className="flex gap-2">
-            <button 
-              onClick={() => loadFromCloud(true)}
-              disabled={isLoading}
-              className="px-4 py-2 bg-slate-100 text-slate-700 rounded hover:bg-slate-200 text-sm font-medium transition-colors disabled:opacity-50"
-            >
-              Aus Cloud laden
-            </button>
-            <button 
-              onClick={saveToCloud}
-              disabled={isLoading || !parsedData}
-              className="px-4 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm font-medium transition-colors disabled:opacity-50"
-            >
-              In Cloud speichern
-            </button>
           </div>
         </div>
       </header>
