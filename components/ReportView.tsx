@@ -101,7 +101,10 @@ export const ReportView: React.FC<ReportViewProps> = ({ dataset, selection, comm
     
     // Determine strict groups present in selection
     const hasTOC = has('TOC');
-    const hasIC = has('IC');
+    const hasIC = s.some((c: string) => {
+        const u = c.toUpperCase();
+        return u.includes('IC') && !u.includes('ICP');
+    });
     const hasICP = has('ICP');
     const hasPH = has('TIT') || has('M1.') || has('M3.') || has('M8.') || has('HH+PHM') || has('LFLFM');
 
