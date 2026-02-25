@@ -130,11 +130,13 @@ export const ReportView: React.FC<ReportViewProps> = ({ dataset, selection, comm
 
     // -- Device Group Colors (Secondary) --
 
-    // Purple: Exclusively pH-LF-TIT group
-    if (hasPH && !hasTOC && !hasIC && !hasICP) {
-        return { className: 'bg-purple-100 border-l-4 border-l-purple-500', hexColor: 'E6CCFF' };
-    }
+    // Exclusively single groups
+    if (hasPH && !hasTOC && !hasIC && !hasICP) return { className: 'bg-purple-100 border-l-4 border-l-purple-500', hexColor: 'E6CCFF' };
+    if (hasIC && !hasTOC && !hasICP && !hasPH) return { className: 'bg-red-200 border-l-4 border-l-red-600', hexColor: 'FF9999' };
+    if (hasICP && !hasTOC && !hasIC && !hasPH) return { className: 'bg-orange-300 border-l-4 border-l-orange-600', hexColor: 'FF9933' };
+    if (hasTOC && !hasIC && !hasICP && !hasPH) return { className: 'bg-cyan-100 border-l-4 border-l-cyan-500', hexColor: 'CCFFFF' };
 
+    // Combinations
     if (hasTOC && hasIC && !hasICP && !hasPH) return { className: 'bg-red-100 border-l-4 border-l-red-500', hexColor: 'FFCCCC' };
     if (hasIC && hasICP && !hasTOC && !hasPH) return { className: 'bg-blue-100 border-l-4 border-l-blue-500', hexColor: 'CCE5FF' };
     if (hasTOC && hasIC && hasICP) return { className: 'bg-green-100 border-l-4 border-l-green-500', hexColor: 'CCFFCC' };
@@ -238,17 +240,34 @@ export const ReportView: React.FC<ReportViewProps> = ({ dataset, selection, comm
 
     // --- Footer Section: Legend + Work Table side-by-side ---
     
-    // Define Legend Items (Col 0 and 1 merged)
-    const legendItems = [
-        { v: "Legende Farbmarkierung:", s: { font: { name: "Arial", bold: true } } },
-        { v: "Nur P (PO4+Pges)", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFFFCC" } } } },
-        { v: "Nur S (SO4+Sges)", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFDDBB" } } } },
-        { v: "N+TC (TOC+IC)", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFCCFF" } } } },
-        { v: "TOC + IC", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFCCCC" } } } },
-        { v: "IC + ICP", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "CCE5FF" } } } },
-        { v: "Alle Gruppen", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "CCFFCC" } } } },
-        { v: "Nur pH-LF-TIT", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "E6CCFF" } } } }
+    // Determine which colors are actually used in the current export
+    const usedColors = new Set<string>();
+    reportData.rows.forEach(row => {
+        const colorStyle = getRowColorClass(row.id);
+        if (colorStyle.hexColor !== 'FFFFFF') {
+            usedColors.add(colorStyle.hexColor);
+        }
+    });
+
+    // Define Legend Items (Col 0 and 1 merged) dynamically based on used colors
+    const legendItems: any[] = [
+        { v: "Legende Farbmarkierung:", s: { font: { name: "Arial", bold: true } } }
     ];
+    
+    if (usedColors.has('FFFFCC')) legendItems.push({ v: "Nur P (PO4+Pges)", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFFFCC" } } } });
+    if (usedColors.has('FFDDBB')) legendItems.push({ v: "Nur S (SO4+Sges)", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFDDBB" } } } });
+    if (usedColors.has('FFCCFF')) legendItems.push({ v: "N+TC (TOC+IC)", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFCCFF" } } } });
+    if (usedColors.has('FF9999')) legendItems.push({ v: "IC", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FF9999" } } } });
+    if (usedColors.has('FF9933')) legendItems.push({ v: "ICP", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FF9933" } } } });
+    if (usedColors.has('CCFFFF')) legendItems.push({ v: "TOC", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "CCFFFF" } } } });
+    if (usedColors.has('E6CCFF')) legendItems.push({ v: "pH-LF-TIT", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "E6CCFF" } } } });
+    if (usedColors.has('FFCCCC')) legendItems.push({ v: "TOC + IC", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "FFCCCC" } } } });
+    if (usedColors.has('CCE5FF')) legendItems.push({ v: "IC + ICP", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "CCE5FF" } } } });
+    if (usedColors.has('CCFFCC')) legendItems.push({ v: "Alle Gruppen", s: { font: { name: "Arial" }, fill: { fgColor: { rgb: "CCFFCC" } } } });
+
+    if (legendItems.length === 1) {
+        legendItems.push({ v: "Keine Farbmarkierungen verwendet", s: { font: { name: "Arial", italic: true, color: { rgb: "666666" } } } });
+    }
 
     // Define Table Items (Cols 3-4 merged, 5, 6 corresponding to D-E, F, G)
     const tableHeader = [
@@ -498,12 +517,14 @@ export const ReportView: React.FC<ReportViewProps> = ({ dataset, selection, comm
             <div className="flex flex-wrap gap-4 mb-4 text-xs">
                 <div className="flex items-center gap-2"><div className="w-4 h-4 bg-yellow-100 border border-yellow-500"></div> P (PO4+Pges)</div>
                 <div className="flex items-center gap-2"><div className="w-4 h-4 bg-orange-100 border border-orange-500"></div> S (SO4+Sges)</div>
-                {/* Changed Label Here */}
                 <div className="flex items-center gap-2"><div className="w-4 h-4 bg-pink-100 border border-pink-500"></div> N+TC (TOC+IC)</div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-red-200 border border-red-600"></div> IC</div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-orange-300 border border-orange-600"></div> ICP</div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-cyan-100 border border-cyan-500"></div> TOC</div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-purple-100 border border-purple-500"></div> pH-LF-TIT</div>
                 <div className="flex items-center gap-2"><div className="w-4 h-4 bg-red-100 border border-red-500"></div> TOC+IC</div>
                 <div className="flex items-center gap-2"><div className="w-4 h-4 bg-blue-100 border border-blue-500"></div> IC+ICP</div>
                 <div className="flex items-center gap-2"><div className="w-4 h-4 bg-green-100 border border-green-500"></div> Alle</div>
-                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-purple-100 border border-purple-500"></div> pH-LF-TIT</div>
             </div>
 
             <table className="w-full text-sm text-left whitespace-nowrap border-collapse">

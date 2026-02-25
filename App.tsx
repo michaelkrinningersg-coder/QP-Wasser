@@ -149,7 +149,7 @@ function App() {
             <div className="bg-blue-600 w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-lg">
               L
             </div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">QP-Wasser Version 0.2.3</h1>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">QP-Wasser Version 0.2.4</h1>
           </div>
         </div>
       </header>
