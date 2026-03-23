@@ -252,21 +252,21 @@ export const IonBalanceAnalysis: React.FC<IonBalanceAnalysisProps> = ({ dataset,
       </div>
 
       <div className="flex-grow bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden flex flex-col">
-        <div className="overflow-x-auto overflow-y-auto flex-grow">
+        <div className="overflow-x-auto overflow-y-auto flex-grow max-h-[70vh]">
           <table className="w-full text-sm text-left text-slate-600 whitespace-nowrap border-separate border-spacing-0">
             <thead className="text-xs text-slate-700 uppercase bg-slate-50 sticky top-0 z-20 shadow-sm">
               <tr>
-                <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 min-w-[120px] shadow-[0_1px_0_0_rgba(226,232,240,1)]">Probenkennung</th>
-                <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 w-16 text-center shadow-[0_1px_0_0_rgba(226,232,240,1)]">WDH</th>
-                <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Alkalinität</th>
-                <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Corg ber.</th>
-                <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Leitfähigkeit</th>
-                <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Q. ELF_eu_korr</th>
-                <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Q. Kat/An NFV</th>
-                <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Theo LF (EU)</th>
-                <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 text-blue-700 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Q. LF/Theo (ber.)</th>
-                <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Bemerkung</th>
-                <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 min-w-[200px] shadow-[0_1px_0_0_rgba(226,232,240,1)]">Kommentar</th>
+                <th className="sticky top-0 z-30 bg-slate-50 px-4 py-3 border-b border-slate-200 min-w-[120px] shadow-[0_1px_0_0_rgba(226,232,240,1)]">Probenkennung</th>
+                <th className="sticky top-0 z-30 bg-slate-50 px-4 py-3 border-b border-slate-200 w-16 text-center shadow-[0_1px_0_0_rgba(226,232,240,1)]">WDH</th>
+                <th className="sticky top-0 z-30 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Alkalinität</th>
+                <th className="sticky top-0 z-30 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Corg ber.</th>
+                <th className="sticky top-0 z-30 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Leitfähigkeit</th>
+                <th className="sticky top-0 z-30 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Q. ELF_eu_korr</th>
+                <th className="sticky top-0 z-30 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Q. Kat/An NFV</th>
+                <th className="sticky top-0 z-30 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Theo LF (EU)</th>
+                <th className="sticky top-0 z-30 bg-slate-50 px-4 py-3 border-b border-slate-200 text-blue-700 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Q. LF/Theo (ber.)</th>
+                <th className="sticky top-0 z-30 bg-slate-50 px-4 py-3 border-b border-slate-200 shadow-[0_1px_0_0_rgba(226,232,240,1)]">Bemerkung</th>
+                <th className="sticky top-0 z-30 bg-slate-50 px-4 py-3 border-b border-slate-200 min-w-[200px] shadow-[0_1px_0_0_rgba(226,232,240,1)]">Kommentar</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -283,7 +283,7 @@ export const IonBalanceAnalysis: React.FC<IonBalanceAnalysisProps> = ({ dataset,
                     {row.display.isCondFallback && <span className="ml-1 text-[10px] align-top text-red-400">*</span>}
                   </td>
                   <td className="px-4 py-2">{row.display.quotientElf}</td>
-                  <td className="px-4 py-2">{row.display.quotientIons}</td>
+                  <td className="px-4 py-2 font-mono text-blue-700">{row.display.quotientIons}</td>
                   <td className="px-4 py-2">{row.display.theoCond}</td>
                   <td className="px-4 py-2 font-mono text-blue-700">{row.display.calcCondQuotient}</td>
                   <td className="px-4 py-2">
