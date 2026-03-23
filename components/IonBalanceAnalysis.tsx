@@ -254,7 +254,7 @@ export const IonBalanceAnalysis: React.FC<IonBalanceAnalysisProps> = ({ dataset,
       <div className="flex-grow bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden flex flex-col">
         <div className="overflow-x-auto overflow-y-auto flex-grow">
           <table className="w-full text-sm text-left text-slate-600 whitespace-nowrap border-separate border-spacing-0">
-            <thead className="text-xs text-slate-700 uppercase bg-slate-50 z-10 shadow-sm">
+            <thead className="text-xs text-slate-700 uppercase bg-slate-50 sticky top-0 z-20 shadow-sm">
               <tr>
                 <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 min-w-[120px] shadow-[0_1px_0_0_rgba(226,232,240,1)]">Probenkennung</th>
                 <th className="sticky top-0 bg-slate-50 px-4 py-3 border-b border-slate-200 w-16 text-center shadow-[0_1px_0_0_rgba(226,232,240,1)]">WDH</th>
